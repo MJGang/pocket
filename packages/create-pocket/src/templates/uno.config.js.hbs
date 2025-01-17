@@ -1,0 +1,29 @@
+import { defineConfig, presetUno, presetAttributify, presetIcons } from 'unocss'
+
+export default defineConfig({
+  presets: [
+    presetUno(),
+    presetAttributify(),
+    presetIcons({
+      scale: 1.2,
+      warn: true
+    })
+  ],
+  shortcuts: {
+    'flex-center': 'flex justify-center items-center',
+    'flex-col-center': 'flex flex-col justify-center items-center'
+  },
+  rules: [
+    [/^m-(\d+)$/, ([, d]) => ({ margin: `${d / 4}rem` })],
+    [/^p-(\d+)$/, ([, d]) => ({ padding: `${d / 4}rem` })]
+  ],
+  theme: {
+    colors: {
+      primary: '#3b82f6',
+      secondary: '#64748b',
+      success: '#10b981',
+      warning: '#f59e0b',
+      danger: '#ef4444'
+    }
+  }
+})
