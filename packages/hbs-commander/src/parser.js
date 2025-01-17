@@ -2,9 +2,7 @@ const State = {
   TEXT: 'TEXT',
   OPEN_TAG_START: 'OPEN_TAG_START',
   OPEN_TAG: 'OPEN_TAG',
-  CLOSE_TAG_START: 'CLOSE_TAG_START',
   CLOSE_TAG: 'CLOSE_TAG',
-  CONTENT: 'CONTENT',
 }
 
 export function parseTemplate(template) {
@@ -31,7 +29,7 @@ export function parseTemplate(template) {
             template[i + 5] === '/'
           ) {
             i += 5
-            state = State.CLOSE_TAG_START
+            state = State.CLOSE_TAG
           } else if (
             template[i + 1] === '!' &&
             template[i + 2] === '-' &&
@@ -67,7 +65,7 @@ export function parseTemplate(template) {
               startIndex: i - buffer.length - 6 - 3, // 6 for {{!-- 3 for -}}
             }
             stack.push(currentTag)
-            state = State.CONTENT
+            state = State.TEXT
             contentStart = i + 1
             buffer = ''
           } else {
@@ -78,38 +76,14 @@ export function parseTemplate(template) {
         }
         break
 
-      case State.CONTENT:
-        if (char === '{' && template[i + 1] === '{') {
-          i++
-          if (template[i + 1] === '!' && template[i + 2] === '-' && template[i + 3] === '-') {
-            i += 3
-            if (template[i + 1] === '/') {
-              i++
-              state = State.CLOSE_TAG_START
-              buffer = ''
-            }
-          }
-        }
-        break
-
-      case State.CLOSE_TAG_START:
-        if (char === ' ') {
-          state = State.CLOSE_TAG
-          buffer = ''
-        } else if (char === '-' && template[i + 1] === '-' && template[i + 2] === '}') {
-          i += 2
-          state = State.CLOSE_TAG
-          buffer = ''
-        } else {
-          // 处理没有空格直接进入闭区间的情况
-          state = State.CLOSE_TAG
-          buffer = char
-        }
-        break
-
       case State.CLOSE_TAG:
-        if (char === '-' && template[i + 1] === '-' && template[i + 2] === '}') {
-          i += 2
+        if (
+          char === '-' &&
+          template[i + 1] === '-' &&
+          template[i + 2] === '}' &&
+          template[i + 3] === '}'
+        ) {
+          i += 3
           const tagName = buffer.trim()
           if (stack.length === 0 || stack[stack.length - 1].type !== tagName) {
             throw new Error(`Invalid closing tag: ${tagName}`)
@@ -118,10 +92,10 @@ export function parseTemplate(template) {
           const openTag = stack.pop()
           operations.push({
             type: openTag.type,
-            content: template.slice(contentStart, i - buffer.length - 5).trim(), // 5 for --}}/
+            content: template.slice(contentStart, i - buffer.length - 4 - 7).trim(), // 4 for --}} 7 for {{!-- /
             attrs: openTag.attrs,
             startIndex: openTag.startIndex,
-            endIndex: i + 1,
+            endIndex: i,
           })
 
           state = State.TEXT
