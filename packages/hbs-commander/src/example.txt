@@ -1,7 +1,0 @@
-{{!-- insert :range="'2,3,4,5'" :www="true" :obj="{qwdq: 'qwdq', qwd: [1, {is: true}]}" :arr="[1,2,3]" --}}
-<div>新增的内容</div>
-{{!-- /insert --}}
-{{!-- replace --}}
-<div>替换的内容</div>
-{{!-- /replace --}}
-{{!-- insert :range="[3,1]" --}}// 新功能{{!-- /insert --}}
