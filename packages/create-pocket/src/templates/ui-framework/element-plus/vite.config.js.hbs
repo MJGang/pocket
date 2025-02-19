@@ -1,12 +1,14 @@
+{{!-- appendRight :row="6" :col="50" :newLine="true" --}}
 import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import AutoImport from 'unplugin-auto-import/vite'
+{{!-- /appendRight --}}
 
-plugins: [
+{{!-- appendRight :row="13" :col="18" :newLine="true" --}}
   Components({
     resolvers: [ElementPlusResolver()],
   }),
   AutoImport({
     resolvers: [ElementPlusResolver()],
   }),
-]
+{{!-- /appendRight --}}

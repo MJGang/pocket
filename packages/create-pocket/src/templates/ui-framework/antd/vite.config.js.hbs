@@ -1,8 +1,10 @@
+{{!-- appendRight :row="6" :col="50" :newLine="true" --}}
 import Components from 'unplugin-vue-components/vite'
 import { AntDesignVueResolver } from 'unplugin-vue-components/resolvers'
+{{!-- /appendRight --}}
 
-plugins: [
-  Components({
-    resolvers: [AntDesignVueResolver()],
-  }),
-]
+{{!-- appendRight :row="13" :col="18" :newLine="true" --}}
+Components({
+  resolvers: [AntDesignVueResolver()],
+}),
+{{!-- /appendRight --}}

@@ -13,10 +13,11 @@ import {
   getPackageManagerQuestions,
 } from '../config/questions.js'
 import { packageManagerCommands } from '../config/commands.js'
-import { cleanupScaffold } from './scaffold.js'
+import { optimizeScaffold } from './scaffold.js'
 import { setupUIFramework } from '../handlers/ui.js'
 import { setupCSSTools } from '../handlers/css.js'
 import { setupGitTools } from '../handlers/git.js'
+import { console } from 'node:inspector'
 
 const { cyan, red, yellow, green } = chalk
 
@@ -134,19 +135,25 @@ export class Creator {
     const spinner = ora(`正在优化 ${projectName} 项目结构 ...`).start()
     this.projectDir = path.join(process.cwd(), this.options.projectName)
     try {
-      await cleanupScaffold(this.projectDir)
+      await optimizeScaffold(this.projectDir)
       spinner.succeed(`${projectName} 项目结构优化成功`)
     } catch (error) {
-      spinner.fail(`${projectName} 项目结构优化失败`)
+      spinner.fail(`${projectName} 项目结构优化失败 ${error}`)
       throw new Error(`${projectName} 项目结构优化失败: ${error.message}`)
     }
   }
 
   async setupDevEnvironment() {
-    console.log('🎁 开发环境配置')
-
-    const { uiFramework, cssPreprocessor, cssTools, gitWorkflowTools, packageManager } =
-      this.options
+    console.log(this.options)
+    const {
+      projectName,
+      packageManager,
+      uiFramework, // 'element-plus'
+      gitWorkflowTools, // [ 'husky', 'lint-staged', 'commitlint', 'changelog' ]
+      cssTools, // 'unocss'
+      cssPreprocessor, // 'scss'
+      wantGitWorkflowTools, // true
+    } = this.options
 
     const tasks = []
     const progress = {
