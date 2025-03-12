@@ -80,7 +80,7 @@ export function getUIQuestions({ uiFramework }) {
 }
 
 // CSS 配置
-export function getCssQuestions({ cssPreprocessor, cssTools }) {
+export function getCssQuestions({ cssPreprocessor, cssTool }) {
   const questions = []
 
   if (!cssPreprocessor) {
@@ -96,10 +96,10 @@ export function getCssQuestions({ cssPreprocessor, cssTools }) {
     })
   }
 
-  if (!cssTools) {
+  if (!cssTool) {
     questions.push({
       type: 'select',
-      name: 'cssTools',
+      name: 'cssTool',
       message: blue('选择 CSS 工具:'),
       choices: [
         { title: 'UnoCSS', value: 'unocss' },

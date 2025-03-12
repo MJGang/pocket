@@ -1,68 +1,60 @@
-import { execAsync } from '../utils/index.js'
-import { getPackageManagerCommands } from '../utils/packageManager.js'
-import { renderTemplate } from '../utils/index.js'
-import fs from 'node:fs'
 import path from 'node:path'
+import { getPackageVersions, updatePackageDependencies } from '../utils/dependencies.js'
+import hbscmd from 'hbs-commander'
 
-export async function setupCSSTools(projectDir, preprocessor, tools, packageManager) {
-  const commands = getPackageManagerCommands(packageManager)
+// 预处理器包映射
+const PREPROCESSOR_PACKAGES = {
+  scss: ['sass'],
+  less: ['less'],
+  none: [],
+}
 
-  // 安装 CSS 预处理器
-  if (preprocessor !== 'none') {
-    await execAsync(`${commands.add} -D ${preprocessor}`, {
-      stdio: 'inherit',
-      cwd: projectDir,
-    })
+// CSS工具包配置
+const CSS_TOOL_PACKAGES = {
+  unocss: {
+    dev: ['unocss', '@unocss/preset-uno', '@unocss/preset-attributify', '@unocss/preset-icons'],
+  },
+  tailwindcss: {
+    dev: ['tailwindcss', 'postcss', 'autoprefixer'],
+  },
+}
+
+export async function setupCSSTools(projectDir, preprocessor, tool, onProgress) {
+  const progressSteps = {
+    init: 0.1,
+    preprocessorInstalled: 0.3,
+    toolDepsInstalled: 0.6,
+    templatesRendered: 1,
   }
 
-  // 安装并配置 CSS 工具
-  if (tools.includes('unocss')) {
-    await execAsync(`${commands.add} -D unocss`, {
-      stdio: 'inherit',
-      cwd: projectDir,
+  try {
+    if (onProgress) onProgress(progressSteps.init)
+
+    // 处理预处理器
+    const preprocessorPkgs = PREPROCESSOR_PACKAGES[preprocessor] || []
+    if (preprocessorPkgs.length > 0) {
+      const versions = await getPackageVersions(preprocessorPkgs)
+      await updatePackageDependencies(projectDir, versions, true)
+      if (onProgress) onProgress(progressSteps.preprocessorInstalled)
+    }
+
+    // 处理CSS工具
+    const { dev = [] } = CSS_TOOL_PACKAGES[tool] || {}
+    if (dev.length > 0) {
+      const versions = await getPackageVersions(dev)
+      await updatePackageDependencies(projectDir, versions, true)
+      if (onProgress) onProgress(progressSteps.toolDepsInstalled)
+    }
+
+    // 渲染对应模板
+    await hbscmd({
+      template: path.join(__dirname, `../templates/css-tools/${tool}`),
+      target: projectDir,
     })
-
-    // 使用模板生成unocss配置文件
-    await renderTemplate('uno.config.js.hbs', {}, path.join(projectDir, 'uno.config.js'))
-
-    // 安装unocss presets
-    await execAsync(
-      `${commands.add} -D @unocss/preset-uno @unocss/preset-attributify @unocss/preset-icons`,
-      {
-        stdio: 'inherit',
-        cwd: projectDir,
-      },
-    )
-  }
-
-  if (tools.includes('tailwindcss')) {
-    await execAsync(`${commands.add} -D tailwindcss postcss autoprefixer`, {
-      stdio: 'inherit',
-      cwd: projectDir,
-    })
-
-    // 生成 tailwind 配置文件
-    await execAsync('npx tailwindcss init', {
-      stdio: 'inherit',
-      cwd: projectDir,
-    })
-
-    // 使用模板生成tailwind配置文件
-    await renderTemplate('tailwind.config.js.hbs', {}, path.join(projectDir, 'tailwind.config.js'))
-
-    // 使用模板生成tailwind样式文件
-    const assetsDir = path.join(projectDir, 'src', 'assets')
-    await fs.promises.mkdir(assetsDir, { recursive: true })
-
-    await renderTemplate('style.css.hbs', {}, path.join(assetsDir, 'style.css'))
-
-    // 更新main.js引入样式
-    const mainJsPath = path.join(projectDir, 'src', 'main.js')
-    let mainJsContent = await fs.promises.readFile(mainJsPath, 'utf-8')
-    mainJsContent = mainJsContent.replace(
-      /import router from ['"]\.\/router['"]/,
-      `import router from './router'\nimport './assets/style.css'`,
-    )
-    await fs.promises.writeFile(mainJsPath, mainJsContent)
+    if (onProgress) onProgress(progressSteps.templatesRendered)
+  } catch (error) {
+    if (onProgress) onProgress('failed')
+    console.error(`修改CSS工具失败: ${error}`)
+    throw error
   }
 }

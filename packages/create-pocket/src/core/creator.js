@@ -41,7 +41,7 @@ export class Creator {
       await this.setupDevEnvironment()
 
       // 安装依赖
-      await this.installDependencies()
+      // await this.installDependencies()
 
       // 生成项目配置文件
       await this.generateProjectConfig()
@@ -150,15 +150,14 @@ export class Creator {
       packageManager,
       uiFramework, // 'element-plus'
       gitWorkflowTools, // [ 'husky', 'lint-staged', 'commitlint', 'changelog' ]
-      cssTools, // 'unocss'
+      cssTool, // 'unocss'
       cssPreprocessor, // 'scss'
-      wantGitWorkflowTools, // true
     } = this.options
 
     const tasks = []
     const progress = {
       ui: { title: `加载 ${uiFramework} 框架`, status: 'pending', progress: 0 },
-      css: { title: `加载 ${cssPreprocessor} 和 ${cssTools}`, status: 'pending', progress: 0 },
+      css: { title: `加载 ${cssPreprocessor} 和 ${cssTool}`, status: 'pending', progress: 0 },
       git: { title: '配置 Git 工作流工具', status: 'pending', progress: 0 },
     }
 
@@ -179,37 +178,24 @@ export class Creator {
       progressBars[key] = bars.create(100, 0, { title: `[${index + 1}/${totalTasks}] ${title}` })
     })
 
-    const updateProgress = (key, status) => {
-      const bar = progressBars[key]
+    const updateProgress = (type, status) => {
+      const bar = progressBars[type]
       if (!bar) return
 
-      // 自动增长到80%
-      const interval = setInterval(() => {
-        if (bar.value >= 80) {
-          clearInterval(interval)
-          return
-        }
-        bar.increment()
-      }, 1000)
-
-      // 完成时更新到100%
-      if (status === 'success' || status === 'failed') {
-        clearInterval(interval)
-        bar.update(100)
-        // console.log('bar', bar)
-        if (status === 'failed') {
-          bar.update(100, { title: bar.payload.title + ' ❌' })
-        } else {
-          bar.update(100, { title: bar.payload.title + ' ✅' })
-        }
-      }
+      bar.update(
+        status === 'success'
+          ? 100
+          : status === 'failed'
+            ? 0
+            : typeof status === 'number'
+              ? Math.floor(status * 100)
+              : 30,
+      )
     }
 
     if (uiFramework !== 'none') {
       tasks.push(
-        setupUIFramework(this.projectDir, uiFramework, (progress) => {
-          progressBars.ui.update(Math.round(progress * 100))
-        })
+        setupUIFramework(this.projectDir, uiFramework, (progress) => updateProgress('ui', progress))
           .then(() => updateProgress('ui', 'success'))
           .catch((err) => {
             updateProgress('ui', 'failed')
@@ -219,9 +205,11 @@ export class Creator {
       updateProgress('ui', 'pending')
     }
 
-    if (cssTools !== 'none') {
+    if (cssTool !== 'none') {
       tasks.push(
-        setupCSSTools(this.projectDir, cssPreprocessor, cssTools, packageManager)
+        setupCSSTools(this.projectDir, cssPreprocessor, cssTool, (progress) =>
+          updateProgress('css', progress),
+        )
           .then(() => updateProgress('css', 'success'))
           .catch((err) => {
             updateProgress('css', 'failed')
@@ -233,7 +221,9 @@ export class Creator {
 
     if (gitWorkflowTools?.length > 0) {
       tasks.push(
-        setupGitTools(this.projectDir, gitWorkflowTools, packageManager)
+        setupGitTools(this.projectDir, gitWorkflowTools, (progress) =>
+          updateProgress('git', progress),
+        )
           .then(() => updateProgress('git', 'success'))
           .catch((err) => {
             updateProgress('git', 'failed')

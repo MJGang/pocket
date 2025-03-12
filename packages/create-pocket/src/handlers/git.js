@@ -2,6 +2,8 @@ import fs from 'node:fs/promises'
 import { execAsync } from '../utils/index.js'
 import { getPackageManagerCommands } from '../utils/packageManager.js'
 import path from 'node:path'
+import hbscmd from 'hbs-commander'
+import { getPackageVersions, updatePackageDependencies } from '../utils/dependencies.js'
 
 /**
  * 写入配置文件
@@ -38,118 +40,69 @@ async function ensureGitInitialized(projectDir) {
   }
 }
 
+// Git工具包配置
+const GIT_TOOL_PACKAGES = {
+  husky: {
+    dev: ['husky'],
+  },
+  'lint-staged': {
+    dev: ['lint-staged'],
+  },
+  commitlint: {
+    dev: ['@commitlint/cli', '@commitlint/config-conventional'],
+  },
+  changelog: {
+    dev: ['conventional-changelog-cli'],
+  },
+}
+
 /**
  * 设置Git工具
  * @param {string} projectDir - 项目目录
- * @param {string[]} tools - 需要安装的工具列表
- * @param {string} packageManager - 包管理器名称
+ * @param {string[]} gitWorkflowTools - 需要安装的工具列表
+ * @param {function} onProgress - 进度回调函数
  * @returns {Promise<void>}
  * @throws {Error} 配置失败时抛出错误
  */
-export async function setupGitTools(projectDir, tools, packageManager) {
-  if (!Array.isArray(tools) || tools.length === 0) {
-    throw new Error('无效的工具配置')
+export async function setupGitTools(projectDir, gitWorkflowTools, onProgress) {
+  const progressSteps = {
+    init: 0.3,
+    depsInstalled: 0.6,
+    templatesRendered: 1,
   }
 
   try {
-    const commands = getPackageManagerCommands(packageManager)
-    if (!commands) {
-      throw new Error('不支持的包管理器')
-    }
-
-    // 确保git已初始化
     await ensureGitInitialized(projectDir)
+    if (onProgress) onProgress(progressSteps.init)
 
-    if (tools.includes('husky')) {
-      console.log('正在配置 husky...')
-      await execAsync(`${commands.add} -D husky`, {
-        stdio: 'inherit',
-        cwd: projectDir,
-      })
-      await execAsync(`npx husky install`, {
-        stdio: 'inherit',
-        cwd: projectDir,
-      })
+    // 收集所有开发依赖
+    const allDevDeps = gitWorkflowTools.reduce((acc, tool) => {
+      const { dev = [] } = GIT_TOOL_PACKAGES[tool] || {}
+      return [...acc, ...dev]
+    }, [])
 
-      // 添加pre-commit hook
-      const preCommitHook = path.join(projectDir, '.husky', 'pre-commit')
-      await fs.mkdir(path.dirname(preCommitHook), { recursive: true })
-      const preCommitContent = await fs.readFile(
-        path.join(__dirname, '../templates/husky/pre-commit.hbs'),
-        'utf-8',
-      )
-      await fs.writeFile(preCommitHook, preCommitContent, { mode: 0o755 })
+    // 批量安装开发依赖
+    if (allDevDeps.length > 0) {
+      const versions = await getPackageVersions(allDevDeps)
+      await updatePackageDependencies(projectDir, versions, true)
     }
+    if (onProgress) onProgress(progressSteps.depsInstalled)
 
-    if (tools.includes('lint-staged')) {
-      console.log('正在配置 lint-staged...')
-      await execAsync(`${commands.add} -D lint-staged`, {
-        stdio: 'inherit',
-        cwd: projectDir,
-      })
+    // 统一并行处理所有模板（使用智能定位）
+    await Promise.all(
+      gitWorkflowTools.map((tool) =>
+        hbscmd({
+          template: path.join(__dirname, `../templates/git-workflow/${tool}`),
+          target: projectDir,
+        }),
+      ),
+    )
 
-      const lintStagedConfig = {
-        '*.{js,jsx,ts,tsx}': ['eslint --fix', 'git add'],
-        '*.{css,scss}': ['stylelint --fix', 'git add'],
-        '*.{json,md}': ['prettier --write', 'git add'],
-      }
-
-      const packageJsonPath = path.join(projectDir, 'package.json')
-      const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf-8'))
-      packageJson['lint-staged'] = lintStagedConfig
-      await writeConfigFile(packageJsonPath, packageJson)
-    }
-
-    if (tools.includes('commitlint')) {
-      console.log('正在配置 commitlint...')
-      await execAsync(`${commands.add} -D @commitlint/{config-conventional,cli}`, {
-        stdio: 'inherit',
-        cwd: projectDir,
-      })
-
-      const commitlintConfig = {
-        extends: ['@commitlint/config-conventional'],
-        rules: {
-          'type-enum': [
-            2,
-            'always',
-            ['feat', 'fix', 'docs', 'style', 'refactor', 'test', 'chore', 'revert'],
-          ],
-        },
-      }
-      await writeConfigFile(
-        path.join(projectDir, 'commitlint.config.js'),
-        `module.exports = ${JSON.stringify(commitlintConfig, null, 2)}`,
-      )
-
-      // 添加commit-msg hook
-      if (tools.includes('husky')) {
-        const commitMsgHook = path.join(projectDir, '.husky', 'commit-msg')
-        const commitMsgContent = await fs.readFile(
-          path.join(__dirname, '../templates/husky/commit-msg.hbs'),
-          'utf-8',
-        )
-        await fs.writeFile(commitMsgHook, commitMsgContent, { mode: 0o755 })
-      }
-    }
-
-    if (tools.includes('changelog')) {
-      console.log('正在配置 conventional-changelog...')
-      await execAsync(`${commands.add} -D conventional-changelog-cli`, {
-        stdio: 'inherit',
-        cwd: projectDir,
-      })
-
-      // 添加changelog生成脚本
-      const packageJsonPath = path.join(projectDir, 'package.json')
-      const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf-8'))
-      packageJson.scripts = packageJson.scripts || {}
-      packageJson.scripts['changelog'] = 'conventional-changelog -p angular -i CHANGELOG.md -s'
-      await writeConfigFile(packageJsonPath, packageJson)
-    }
+    if (onProgress) onProgress(progressSteps.templatesRendered)
 
     console.log('Git 工具配置完成')
   } catch (error) {
-    throw new Error('配置 Git 工具时出错：', error)
+    if (onProgress) onProgress('failed')
+    throw new Error(`Git 工具配置失败: ${error.message}`)
   }
 }

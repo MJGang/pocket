@@ -20,10 +20,9 @@ const CLI_OPTIONS = {
   //   short: 'g',
   //   transform: (value) => value.split(','), // 转换函数
   // },
-  // cssTools: {
+  // cssTool: {
   //   type: 'string',
   //   short: 'c',
-  //   transform: (value) => value.split(','),
   //   values: ['unocss', 'tailwindcss', 'none'],
   // },
 }
@@ -45,7 +44,7 @@ async function main() {
     packageManager: argv.packageManager,
     uiFramework: argv.uiFramework,
     gitWorkflowTools: argv.gitWorkflowTools ? argv.gitWorkflowTools.split(',') : undefined,
-    cssTools: argv.cssTools ? argv.cssTools.split(',') : undefined,
+    cssTool: argv.cssTool,
   })
 
   // 创建项目
