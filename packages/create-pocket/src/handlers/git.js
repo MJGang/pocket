@@ -94,9 +94,12 @@ export async function setupGitTools(projectDir, gitWorkflowTools, onProgress) {
         hbscmd({
           template: path.join(__dirname, `../templates/git-workflow/${tool}`),
           target: projectDir,
+          deferWrite: true,
         }),
       ),
     )
+    // 手动触发写入
+    await hbscmd.applyDeferredWrites()
 
     if (onProgress) onProgress(progressSteps.templatesRendered)
 
