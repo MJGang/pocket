@@ -5,6 +5,7 @@ import chalk from 'chalk'
 import ora from 'ora'
 import { MultiBar } from 'cli-progress'
 import { execAsync } from '../utils/index.js'
+import { PocketLogger } from '../utils/logger.js'
 import {
   getUIQuestions,
   getCssQuestions,
@@ -19,7 +20,7 @@ import { setupCSSTools } from '../handlers/css.js'
 import { setupGitTools } from '../handlers/git.js'
 import { console } from 'node:inspector'
 
-const { cyan, red, yellow, green } = chalk
+const { cyan } = chalk
 
 export class Creator {
   constructor(cliOptions = {}) {
@@ -49,7 +50,7 @@ export class Creator {
       // 显示完成消息
       this.showCompletionMessage()
     } catch (err) {
-      console.log(err.message)
+      PocketLogger.error(err.message)
       process.exit(1)
     }
   }
@@ -94,7 +95,7 @@ export class Creator {
 
     const result = await prompts(questions, {
       onCancel: (err) => {
-        throw new Error(red('✖') + ` ${err.message}`)
+        throw new Error(chalk.red('✖') + ` ${err.message}`)
       },
     })
 
@@ -117,7 +118,7 @@ export class Creator {
       '--eslint-with-prettier',
       '--force',
     ].join(' ')
-    const spinner = ora(`正在创建 ${projectName} 项目...`).start()
+    const spinner = PocketLogger.spinner(`正在创建 ${projectName} 项目...`)
     try {
       await execAsync(command, {
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -132,7 +133,7 @@ export class Creator {
 
   async optimizeProject() {
     const { projectName } = this.options
-    const spinner = ora(`正在优化 ${projectName} 项目结构 ...`).start()
+    const spinner = PocketLogger.spinner(`正在优化 ${projectName} 项目结构 ...`)
     this.projectDir = path.join(process.cwd(), this.options.projectName)
     try {
       await optimizeScaffold(this.projectDir)
@@ -144,7 +145,7 @@ export class Creator {
   }
 
   async setupDevEnvironment() {
-    console.log(this.options)
+    PocketLogger.info(this.options)
     const {
       projectName,
       packageManager,
@@ -254,15 +255,15 @@ export class Creator {
   }
 
   showCompletionMessage() {
-    console.log(green(`\n✨ 项目 ${this.options.projectName} 创建成功！\n`))
-    console.log('👉 接下来你可以：\n')
+    PocketLogger.success(`✨ 项目 ${this.options.projectName} 创建成功！\n`)
+    PocketLogger.info('👉 接下来你可以：\n')
     console.log(cyan(`  cd ${this.options.projectName}`))
     console.log(cyan(`  ${this.options.packageManager} dev`))
     console.log()
   }
 
   async installDependencies() {
-    console.log(yellow('正在安装依赖...'))
+    PocketLogger.info('正在安装依赖...')
     const { packageManager } = this.options
     const commands = packageManagerCommands[packageManager]
 
@@ -272,7 +273,7 @@ export class Creator {
         cwd: this.projectDir,
       })
     } catch (error) {
-      console.error(red('依赖安装失败:'), error)
+      PocketLogger.error('依赖安装失败:', error)
       throw error
     }
   }

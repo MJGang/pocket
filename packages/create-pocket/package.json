@@ -2,8 +2,8 @@
   "name": "create-pocket",
   "version": "0.0.1",
   "type": "module",
-  "license": "ISC",
-  "author": "Mj Gang",
+  "license": "MIT",
+  "author": "MJGang",
   "bin": {
     "create-pocket": "index.js"
   },

@@ -1,3 +1,5 @@
+import { PocketLogger } from './logger.js'
+
 const REGISTRY_URLS = ['https://registry.npmmirror.com']
 
 export async function getLatestVersion(packageName) {
@@ -49,7 +51,7 @@ function handleResponse(index, controllers) {
 function handleError(index) {
   return (error) => {
     if (error.name !== 'AbortError') {
-      console.warn(`Registry ${REGISTRY_URLS[index]} 请求失败: ${error.message}`)
+      PocketLogger.warning(`Registry ${REGISTRY_URLS[index]} 请求失败: ${error.message}`)
     }
     return null
   }

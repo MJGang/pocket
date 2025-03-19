@@ -1,8 +1,8 @@
 import { parseArgs } from 'node:util'
-import chalk from 'chalk'
 import { showWelcomeBanner } from './utils/banners.js'
 import { validateOptions } from './utils/validate.js'
 import { Creator } from './core/creator.js'
+import { PocketLogger } from './utils/logger.js'
 
 const CLI_OPTIONS = {
   packageManager: {
@@ -52,6 +52,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.log(chalk.red('\n☠️  发生错误:'), err)
+  PocketLogger.error('☠️  发生错误:', err)
   process.exit(1)
 })

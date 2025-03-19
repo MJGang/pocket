@@ -31,7 +31,7 @@ ${blue('═══════ ════════ ═══════ ═
 `,
 
   // 版本信息
-  versionInfo: (version) => `版本号: v-${version}`,
+  versionInfo: (version) => `[${chalk.cyan('create-pocket')}] 版本号: v-${version}`,
 }
 
 export function showWelcomeBanner() {
