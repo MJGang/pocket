@@ -15,7 +15,6 @@ export async function optimizeScaffold(projectDir) {
     path.join(projectDir, 'src', 'views', 'AboutView.vue'),
     path.join(projectDir, 'src', 'views', 'HomeView.vue'),
     path.join(projectDir, 'src', 'stores', 'counter.js'),
-    path.join(projectDir, 'src', 'router', 'index.js'),
   ]
 
   // 批量删除文件

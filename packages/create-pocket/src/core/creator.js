@@ -2,9 +2,6 @@ import path from 'node:path'
 import prompts from 'prompts'
 import fs from 'node:fs'
 import chalk from 'chalk'
-import ora from 'ora'
-import { MultiBar } from 'cli-progress'
-import { execAsync } from '../utils/index.js'
 import { PocketLogger } from '../utils/logger.js'
 import {
   getUIQuestions,
@@ -15,12 +12,12 @@ import {
 } from '../config/questions.js'
 import { packageManagerCommands } from '../config/commands.js'
 import { optimizeScaffold } from './scaffold.js'
-import { setupUIFramework } from '../handlers/ui.js'
-import { setupCSSTools } from '../handlers/css.js'
-import { setupGitTools } from '../handlers/git.js'
-import { console } from 'node:inspector'
+import { updatePackageJson } from '../utils/dependencies.js'
+import hbscmd from 'hbs-commander'
+import { exec } from 'node:child_process'
+import { promisify } from 'node:util'
 
-const { cyan } = chalk
+const execAsync = promisify(exec)
 
 export class Creator {
   constructor(cliOptions = {}) {
@@ -118,163 +115,141 @@ export class Creator {
       '--eslint-with-prettier',
       '--force',
     ].join(' ')
-    const spinner = PocketLogger.spinner(`正在创建 ${projectName} 项目...`)
+    PocketLogger.info(`Running 创建项目目录`)
     try {
       await execAsync(command, {
         stdio: ['ignore', 'pipe', 'pipe'],
         timeout: 10000,
       })
-      spinner.succeed(`${projectName} 项目创建成功`)
     } catch (error) {
-      spinner.fail(`创建 ${projectName} 项目失败`)
-      throw new Error(`创建 ${projectName} 项目失败: ${error.message}`)
+      throw new Error(`${projectName} 项目创建失败: ${error.message}`)
     }
   }
 
   async optimizeProject() {
+    PocketLogger.info(`Running 优化项目结构`)
+
     const { projectName } = this.options
-    const spinner = PocketLogger.spinner(`正在优化 ${projectName} 项目结构 ...`)
-    this.projectDir = path.join(process.cwd(), this.options.projectName)
+
+    this.projectDir = path.join(process.cwd(), projectName)
     try {
       await optimizeScaffold(this.projectDir)
-      spinner.succeed(`${projectName} 项目结构优化成功`)
     } catch (error) {
-      spinner.fail(`${projectName} 项目结构优化失败 ${error}`)
-      throw new Error(`${projectName} 项目结构优化失败: ${error.message}`)
+      throw new Error(`项目结构优化失败: ${error.message}`)
     }
   }
 
   async setupDevEnvironment() {
-    PocketLogger.info(this.options)
+    PocketLogger.info(`Running 配置依赖项`)
     const {
-      projectName,
-      packageManager,
       uiFramework, // 'element-plus'
       gitWorkflowTools, // [ 'husky', 'lint-staged', 'commitlint', 'changelog' ]
       cssTool, // 'unocss'
       cssPreprocessor, // 'scss'
     } = this.options
 
-    const tasks = []
-    const progress = {
-      ui: { title: `加载 ${uiFramework} 框架`, status: 'pending', progress: 0 },
-      css: { title: `加载 ${cssPreprocessor} 和 ${cssTool}`, status: 'pending', progress: 0 },
-      git: { title: '配置 Git 工作流工具', status: 'pending', progress: 0 },
+    let tasks = [uiFramework, cssTool, cssPreprocessor]
+    if (Array.isArray(gitWorkflowTools) && gitWorkflowTools.length > 0) {
+      tasks.push(...gitWorkflowTools)
     }
-
-    const bars = new MultiBar({
-      format: '{title} [{bar}] {percentage}%',
-      barCompleteChar: '\u2588',
-      barIncompleteChar: '\u2591',
-      hideCursor: true,
-      barGlue: ' ',
-      align: 'left',
-    })
-
-    const progressBars = {}
-    const totalTasks = Object.keys(progress).length
-
-    // 初始化进度条
-    Object.entries(progress).forEach(([key, { title }], index) => {
-      progressBars[key] = bars.create(100, 0, { title: `[${index + 1}/${totalTasks}] ${title}` })
-    })
-
-    const updateProgress = (type, status) => {
-      const bar = progressBars[type]
-      if (!bar) return
-
-      bar.update(
-        status === 'success'
-          ? 100
-          : status === 'failed'
-            ? 0
-            : typeof status === 'number'
-              ? Math.floor(status * 100)
-              : 30,
-      )
+    /**
+     * 确保Git仓库已初始化
+     * @param {string} projectDir - 项目目录
+     * @returns {Promise<void>}
+     */
+    async function ensureGitInitialized(projectDir) {
+      try {
+        await execAsync('git rev-parse --git-dir', { cwd: projectDir })
+      } catch {
+        try {
+          await execAsync('git init', { cwd: projectDir })
+        } catch (error) {
+          throw new Error(`Git 初始化失败: ${error.message}`)
+        }
+      }
     }
+    tasks = tasks
+      .filter((v) => v !== 'none')
+      .map((name) => {
+        PocketLogger.info(`新增特性 ${name}`)
+        const callback = async () => {
+          await updatePackageJson(this.projectDir, name)
 
-    if (uiFramework !== 'none') {
-      tasks.push(
-        setupUIFramework(this.projectDir, uiFramework, (progress) => updateProgress('ui', progress))
-          .then(() => updateProgress('ui', 'success'))
-          .catch((err) => {
-            updateProgress('ui', 'failed')
-            throw err
-          }),
-      )
-      updateProgress('ui', 'pending')
-    }
+          if (name === uiFramework) {
+            // 修改框架相关文件
+            await hbscmd({
+              template: path.join(__dirname, `../templates/ui-framework/${name}`),
+              target: this.projectDir,
+            })
+          }
 
-    if (cssTool !== 'none') {
-      tasks.push(
-        setupCSSTools(this.projectDir, cssPreprocessor, cssTool, (progress) =>
-          updateProgress('css', progress),
-        )
-          .then(() => updateProgress('css', 'success'))
-          .catch((err) => {
-            updateProgress('css', 'failed')
-            throw err
-          }),
-      )
-      updateProgress('css', 'pending')
-    }
+          if (name === cssTool) {
+            await hbscmd({
+              template: path.join(__dirname, `../templates/css-tools/${name}`),
+              target: this.projectDir,
+            })
+          }
 
-    if (gitWorkflowTools?.length > 0) {
-      tasks.push(
-        setupGitTools(this.projectDir, gitWorkflowTools, (progress) =>
-          updateProgress('git', progress),
-        )
-          .then(() => updateProgress('git', 'success'))
-          .catch((err) => {
-            updateProgress('git', 'failed')
-            throw err
-          }),
-      )
-      updateProgress('git', 'pending')
-    }
+          if (Array.isArray(gitWorkflowTools) && gitWorkflowTools.includes(name)) {
+            await ensureGitInitialized(this.projectDir)
+            // 统一并行处理所有模板（使用智能定位）
+            await hbscmd({
+              template: path.join(__dirname, `../templates/git-workflow/${name}`),
+              target: this.projectDir,
+              deferWrite: true,
+            })
+            // 手动触发写入
+            await hbscmd.applyDeferredWrites()
+          }
+        }
+        return callback
+      })
 
-    try {
-      await Promise.all(tasks)
-      bars.stop()
-    } catch (error) {
-      bars.stop()
-      throw new Error(`开发环境配置失败: ${error.message}`)
+    // 顺序执行所有任务，避免竞态问题
+    for (const task of tasks) {
+      await task()
     }
   }
 
   async generateProjectConfig() {
+    PocketLogger.info(`Running 生成项目配置文件`)
     const config = {
       name: this.options.projectName,
       version: '0.0.1',
       createTime: new Date().toISOString(),
     }
 
+    const configPath = path.join(this.projectDir, 'pocket.config.js')
     const jsConfig = `export default ${JSON.stringify(config, null, 2)}`
-    await fs.promises.writeFile(path.join(this.projectDir, 'pocket.config.js'), jsConfig)
+
+    await fs.promises.writeFile(configPath, jsConfig)
   }
 
   showCompletionMessage() {
-    PocketLogger.success(`✨ 项目 ${this.options.projectName} 创建成功！\n`)
-    PocketLogger.info('👉 接下来你可以：\n')
-    console.log(cyan(`  cd ${this.options.projectName}`))
-    console.log(cyan(`  ${this.options.packageManager} dev`))
-    console.log()
+    PocketLogger.success(`✨ 项目 ${this.options.projectName} 创建成功！`)
+    PocketLogger.info('👉 接下来你可以:')
+    PocketLogger.info(`   cd ${this.options.projectName}`)
+    PocketLogger.info(`   ${this.options.packageManager} install`)
+    PocketLogger.info(`   ${this.options.packageManager} dev`)
   }
 
   async installDependencies() {
-    PocketLogger.info('正在安装依赖...')
+    // 切到项目目录
+    process.chdir(this.projectDir)
+    const { start, succeed, fail } = PocketLogger.spinner('正在安装依赖...')
+    start()
     const { packageManager } = this.options
     const commands = packageManagerCommands[packageManager]
 
     try {
-      execAsync(commands.install, {
+      await execAsync(commands.install, {
         stdio: 'inherit',
         cwd: this.projectDir,
       })
+      succeed('依赖安装成功')
     } catch (error) {
-      PocketLogger.error('依赖安装失败:', error)
-      throw error
+      fail('依赖安装失败')
+      throw new Error(`依赖安装失败: ${error.message}`)
     }
   }
 }
