@@ -1,6 +1,21 @@
 {
   "name": "create-pocket",
-  "version": "0.0.1",
+  "description": "Create modern frontend applications with best practices and material system support",
+  "keywords": [
+    "pocket",
+    "create",
+    "scaffold",
+    "template",
+    "frontend",
+    "boilerplate",
+    "project-generator"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MJGang/pocket.git",
+    "directory": "packages/create-pocket"
+  },
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "author": "MJGang",

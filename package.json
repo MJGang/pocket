@@ -1,7 +1,7 @@
 {
   "name": "pocket",
-  "version": "1.0.0",
-  "description": "",
+  "version": "0.0.1",
+  "description": "A modern frontend scaffolding tool with visual page builder and reusable material system",
   "main": "index.js",
   "scripts": {
     "lint": "eslint . --fix",
@@ -9,7 +9,16 @@
     "build": "pnpm -r --filter='./packages/*' run build",
     "dev": "pnpm -r --parallel --filter='./packages/*' run dev"
   },
-  "keywords": [],
+  "keywords": [
+    "frontend",
+    "scaffolding",
+    "visual",
+    "page-builder",
+    "material",
+    "components",
+    "templates",
+    "development-tool"
+  ],
   "author": "",
   "license": "ISC",
   "devDependencies": {

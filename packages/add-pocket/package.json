@@ -1,0 +1,20 @@
+{
+  "name": "add-pocket",
+  "version": "0.0.1",
+  "description": "Add components and pages to your Pocket project from the material hub",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "pocket",
+    "add",
+    "component",
+    "page",
+    "material",
+    "copy-in-place",
+    "installer"
+  ],
+  "author": "",
+  "license": "ISC"
+}
